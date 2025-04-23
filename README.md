@@ -92,12 +92,20 @@ if (!gpio1.init(INPUT_PIN, GPIO_MODE_INPUT_PULLUP, DEBOUNCE_US, GPIO_EDGE_BOTH))
 uint32_t edge;
 
 // watch changes
-while(gpio1.watch(edge))
-{
-    if (edge == GPIO_EDGE_RISING)
-        puts("rising edge occurs");
-    else
-        puts("falling edge occurs");
-}
+if (!gpio1.watch(edge))
+    return false;
+
+// print edge
+if (edge == GPIO_EDGE_RISING)
+    puts("rising edge occurs");
+else if (edge == GPIO_EDGE_FALLING)
+    puts("falling edge occurs");
 ```
 
+### class c_worker
+The **c_worker** class is a simple thread implementation and has its own header file **c_worker.h**.<br>
+For usage, see the examples.
+
+```c++
+#include "../include/c_worker.h"
+```
