@@ -103,7 +103,7 @@ else if (edge == GPIO_EDGE_FALLING)
 ```
 
 ### class c_worker
-The **c_worker** class is a simple thread implementation and has its own header file **c_worker.h**.<br>
+The **c_worker** class is a simple thread wrapper implementation and has its own header file **c_worker.h**.<br>
 For usage, see the examples.
 
 ```c++
