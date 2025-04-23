@@ -31,7 +31,7 @@ Some examples are in the **examples** folder.
 |GPIO_EDGE_NONE|no edge|
 
 ### class c_chip
-The class c chip is instantiated only once and passed to the class c_gpio.<br>
+The class **c_chip** is instantiated only once and passed to the class **c_gpio**.<br>
 
 example:
 
