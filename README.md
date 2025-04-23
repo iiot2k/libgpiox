@@ -33,8 +33,6 @@ Some examples are in the **examples** folder.
 ### class c_chip
 The class **c_chip** is instantiated only once and passed to the class **c_gpio**.<br>
 
-example:
-
 ```c++
 c_chip chip;
 ```
