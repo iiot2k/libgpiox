@@ -12,6 +12,18 @@ Therefore the **libgpiox** library does not need to be built.<br>
 
 Some examples are in the **examples** folder.
 
+> Build examples:
+
+```
+cd examples
+make
+```
+> Execute examples:
+
+```
+./blink
+```
+
 ### Constants
 
 |Mode-Constant|Function|
