@@ -50,8 +50,8 @@ c_gpio gpio2(&chip, PRINT_MSG);
 The created instance is initialized with the **init** function.<br>
 
 ```c++
-#define INPUT_PIN 21 // gpio pin number
-#define OUTPUT_PIN 21 // gpio pin number
+#define INPUT_PIN 21 // input gpio pin number
+#define OUTPUT_PIN 20 // output gpio pin number
 #define DEBOUNCE_US 10000 // debounce in us
 
 // init input
@@ -67,19 +67,25 @@ After initialization, input/output functions can be called.<br>
 The input/output functions are thread-safe.<br>
 
 ```c++
-uint32_t input_val;
+int32_t input_val;
 
 // read input
 if (!gpio1.read(input_val))
     return false;
 
 // write output 0
-if (!gpio2.write(0))
-    return false:
+if (!gpio2.write(1))
+    return false;
 
 // toggle output
 if (!gpio2.toggle())
-    return false:
+    return false;
+
+// read output
+int32_t output_val = gpio2.read();
+
+if (output_val == -1)
+    return false;
 ```
 
 Monitoring the change of the input pin is possible with the **watch** function.<br>
@@ -104,8 +110,37 @@ else if (edge == GPIO_EDGE_FALLING)
 
 ### class c_worker
 The **c_worker** class is a simple thread wrapper implementation and has its own header file **c_worker.h**.<br>
-For usage, see the examples.
 
 ```c++
 #include "../include/c_worker.h"
+
+// derived worker class
+class c_myworker : public c_worker
+{
+public:
+    c_myworker(c_gpio* gpio)
+    {
+        m_gpio = gpio;
+    }
+
+    ~c_myworker() {}
+
+    // execute thread 
+    void Execute() override
+    {
+        m_gpio->write(1);
+    }
+private: 
+    c_gpio* m_gpio;
+}
+
+...
+
+// create worker thread
+c_myworker* wk = new c_myworker(&gpio2);
+
+// start worker thread and wait until ends
+wk->Queue(true);
+
 ```
+
