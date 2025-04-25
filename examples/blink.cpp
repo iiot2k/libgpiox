@@ -54,11 +54,11 @@ int main()
 
     // init input
     if (!gpio1.init(INPUT_PIN, GPIO_MODE_INPUT_PULLUP, DEBOUNCE_US))
-    	return 1;
+        return 1;
 
     // init output
     if (!gpio2.init(OUTPUT_PIN, GPIO_MODE_OUTPUT))
-    	return 1;
+        return 1;
 
     // blink output
     while(1)
@@ -67,7 +67,7 @@ int main()
 
         // read input
         if (input_val == -1)
-        	return 1;
+            return 1;
 
         // set blink rate depends on input state
         int32_t t_ms = (input_val == 1) ? BLINK_TIME_MS_1 : BLINK_TIME_MS_2;

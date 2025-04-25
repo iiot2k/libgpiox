@@ -51,11 +51,11 @@ int main()
 
     // init input with edge
     if (!gpio1.init(INPUT_PIN, GPIO_MODE_INPUT_PULLUP, DEBOUNCE_US, GPIO_EDGE_BOTH))
-    	return 1;
+        return 1;
 
     // init output
     if (!gpio2.init(OUTPUT_PIN, GPIO_MODE_OUTPUT))
-    	return 1;
+        return 1;
     
     uint32_t edge;
 

@@ -85,11 +85,11 @@ int main()
 
     // init output 1
     if (!gpio1.init(OUTPUT_PIN1, GPIO_MODE_OUTPUT))
-    	return 1;
+        return 1;
 
     // init output 2
     if (!gpio2.init(OUTPUT_PIN2, GPIO_MODE_OUTPUT))
-    	return 1;
+        return 1;
 
     // create blink thread 1
     c_blink* wk1 = new c_blink(&gpio1, BLINK_TIME_MS_1);

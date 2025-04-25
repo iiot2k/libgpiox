@@ -110,7 +110,7 @@ public:
      */
     ~c_gpio()
     {
-    	deinit();
+        deinit();
     }
 
     /**
@@ -132,15 +132,15 @@ public:
      */
     bool print_err(const char* msg = NULL)
     {
-    	if (m_print_msg)
-    	{
-    		if (msg == NULL)
-    			perror(strerror(errno));
-    		else
-    			perror(msg);
-    	}
+        if (m_print_msg)
+        {
+            if (msg == NULL)
+                perror(strerror(errno));
+            else
+                perror(msg);
+        }
 
-    	return false;
+        return false;
     }
 
     /**
@@ -159,17 +159,17 @@ public:
      */
     bool init(uint32_t pin, uint32_t mode, uint32_t setval = 0, uint32_t edge = GPIO_EDGE_NONE)
     {
-    	// check pin
-    	if (pin >= N_PIN)
-			return print_err("invalid pin");
+        // check pin
+        if (pin >= N_PIN)
+            return print_err("invalid pin");
 
-    	// valid chip ?
-    	if (m_chip == NULL)
-			return print_err("invalid chip");
+        // valid chip ?
+        if (m_chip == NULL)
+            return print_err("invalid chip");
 
-    	// check if chip is open
+        // check if chip is open
         if (m_chip->get_fd() == -1)
-			return print_err("chip not open");
+            return print_err("chip not open");
 
         // close gpio
         deinit();
@@ -190,21 +190,21 @@ public:
             line_request.config.flags = GPIO_V2_LINE_FLAG_INPUT + GPIO_V2_LINE_FLAG_BIAS_DISABLED;
             set_line_debounce_us(line_request.config, setval);
             if (!set_edge_value(line_request.config, edge))
-            	return false;
+                return false;
             break;
 
         case GPIO_MODE_INPUT_PULLDOWN:
             line_request.config.flags = GPIO_V2_LINE_FLAG_INPUT + GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN;
             set_line_debounce_us(line_request.config, setval);
             if (!set_edge_value(line_request.config, edge))
-            	return false;
+                return false;
             break;
 
         case GPIO_MODE_INPUT_PULLUP:
             line_request.config.flags = GPIO_V2_LINE_FLAG_INPUT + GPIO_V2_LINE_FLAG_BIAS_PULL_UP + GPIO_V2_LINE_FLAG_ACTIVE_LOW;
             set_line_debounce_us(line_request.config, setval);
             if (!set_edge_value(line_request.config, edge))
-            	return false;
+                return false;
             break;
 
         case GPIO_MODE_OUTPUT:
@@ -213,27 +213,27 @@ public:
             break;
 
         case GPIO_MODE_OUTPUT_SOURCE:
-        	line_request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT + GPIO_V2_LINE_FLAG_OPEN_SOURCE;
+            line_request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT + GPIO_V2_LINE_FLAG_OPEN_SOURCE;
             setval = 0;
             set_line_value(line_request.config, setval);
             break;
 
         case GPIO_MODE_OUTPUT_SINK:
-        	line_request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT + GPIO_V2_LINE_FLAG_OPEN_DRAIN + GPIO_V2_LINE_FLAG_ACTIVE_LOW;
+            line_request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT + GPIO_V2_LINE_FLAG_OPEN_DRAIN + GPIO_V2_LINE_FLAG_ACTIVE_LOW;
             set_line_value(line_request.config, setval);
             break;
 
         default:
-			return print_err("invalid mode");
+            return print_err("invalid mode");
         }
 
         // init gpio pin
         if (ioctl(m_chip->get_fd(), GPIO_V2_GET_LINE_IOCTL, &line_request) == -1)
-			return print_err();
+            return print_err();
 
         // check for valid handle
         if (line_request.fd < 0)
-			return print_err();
+            return print_err();
 
         // set file handle
         m_fd = line_request.fd;
@@ -250,7 +250,7 @@ public:
      */
     int32_t read()
     {
-		const lock_guard<mutex> lock(m_mtx);
+        const lock_guard<mutex> lock(m_mtx);
 
         if (m_pin == -1)
         {
@@ -258,17 +258,17 @@ public:
             return -1;
         }
 
-		gpio_v2_line_values line_values;
-	    line_values.mask = 1;
-	    line_values.bits = 0;
+        gpio_v2_line_values line_values;
+        line_values.mask = 1;
+        line_values.bits = 0;
 
-	    if (ioctl(m_fd, GPIO_V2_LINE_GET_VALUES_IOCTL, &line_values))
+        if (ioctl(m_fd, GPIO_V2_LINE_GET_VALUES_IOCTL, &line_values))
         {
-			print_err();
+            print_err();
             return -1;
         }
 
-	    return (line_values.bits == 1) ? 1 : 0;
+        return (line_values.bits == 1) ? 1 : 0;
     }
 
     /**
@@ -278,20 +278,20 @@ public:
      */
     bool write(int32_t val)
     {
-		const lock_guard<mutex> lock(m_mtx);
+        const lock_guard<mutex> lock(m_mtx);
 
         if (m_pin == -1)
             return print_err("not init");
 
-		gpio_v2_line_values line_values;
-	    line_values.mask = 1;
-	    line_values.bits = val > 0 ? 1 : 0;
+        gpio_v2_line_values line_values;
+        line_values.mask = 1;
+        line_values.bits = val > 0 ? 1 : 0;
 
-	    // write gpio pin
-	    if (ioctl(m_fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &line_values) == -1)
-			return print_err();
+        // write gpio pin
+        if (ioctl(m_fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &line_values) == -1)
+            return print_err();
 
-	    return true;
+        return true;
     }
 
     /**
@@ -318,58 +318,58 @@ public:
      * @param edge receives edge constant GPIO_EDGE_RISING or GPIO_EDGE_FALLING
      * @returns true: valid gpio event, false: error
      */
-	bool watch(uint32_t& edge)
-	{
+    bool watch(uint32_t& edge)
+    {
         if (m_pin == -1)
             return print_err("not init");
 
             // event data
-	    gpio_v2_line_event event_data;
+        gpio_v2_line_event event_data;
 
-	    // poll data
+        // poll data
         pollfd pfd = { .fd = m_fd, .events = POLLIN, .revents = 0 };
 
-	    while(1)
-	    {
-	    	// wait for event
-	        if (poll(&pfd, 1, -1) <= 0)
-			    return print_err();
-
-	        // read event data
-	        int32_t ret = ::read(m_fd, &event_data, sizeof(event_data));
-
-	        // check retun code
-	        if (ret == -1)
-	        {
-	            // read again
-	            if (errno == -EAGAIN)
-	                continue;
-	            else
-			        return print_err();
-	        }
-
-	        // check if read all data
-	        if (ret != sizeof(event_data))
+        while(1)
+        {
+            // wait for event
+            if (poll(&pfd, 1, -1) <= 0)
                 return print_err();
 
-	        break;
-	    }
+            // read event data
+            int32_t ret = ::read(m_fd, &event_data, sizeof(event_data));
 
-	    // set event edge
-	    switch(event_data.id)
-	    {
-	    case GPIO_V2_LINE_EVENT_RISING_EDGE:
-	        edge = GPIO_EDGE_RISING;
-	        break;
-	    case GPIO_V2_LINE_EVENT_FALLING_EDGE:
-	        edge = GPIO_EDGE_FALLING;
-	        break;
-	    default:
-		    edge = GPIO_EDGE_NONE;
-	    }
+            // check retun code
+            if (ret == -1)
+            {
+                // read again
+                if (errno == -EAGAIN)
+                    continue;
+                else
+                    return print_err();
+            }
 
-	    return true;
-	}
+            // check if read all data
+            if (ret != sizeof(event_data))
+                return print_err();
+
+            break;
+        }
+
+        // set event edge
+        switch(event_data.id)
+        {
+        case GPIO_V2_LINE_EVENT_RISING_EDGE:
+            edge = GPIO_EDGE_RISING;
+            break;
+        case GPIO_V2_LINE_EVENT_FALLING_EDGE:
+            edge = GPIO_EDGE_FALLING;
+            break;
+        default:
+            edge = GPIO_EDGE_NONE;
+        }
+
+        return true;
+    }
 
 private:
     // set debounce parameter
@@ -397,18 +397,18 @@ private:
         switch(edge)
         {
         case GPIO_EDGE_RISING:
-        	line_config.flags += GPIO_V2_LINE_FLAG_EDGE_RISING;
+            line_config.flags += GPIO_V2_LINE_FLAG_EDGE_RISING;
             break;
         case GPIO_EDGE_FALLING:
-        	line_config.flags += GPIO_V2_LINE_FLAG_EDGE_FALLING;
+            line_config.flags += GPIO_V2_LINE_FLAG_EDGE_FALLING;
             break;
         case GPIO_EDGE_BOTH:
-        	line_config.flags += GPIO_V2_LINE_FLAG_EDGE_RISING + GPIO_V2_LINE_FLAG_EDGE_FALLING;
+            line_config.flags += GPIO_V2_LINE_FLAG_EDGE_RISING + GPIO_V2_LINE_FLAG_EDGE_FALLING;
             break;
         case GPIO_EDGE_NONE:
             break;
         default:
-			return print_err("invalid edge");
+            return print_err("invalid edge");
         }
 
         return true;

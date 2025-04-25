@@ -79,11 +79,11 @@ int main()
 
     // init input 1 with edge
     if (!gpio1.init(INPUT_PIN1, GPIO_MODE_INPUT_PULLUP, DEBOUNCE_US, GPIO_EDGE_BOTH))
-    	return 1;
+        return 1;
 
     // init input 2 with edge
     if (!gpio2.init(INPUT_PIN2, GPIO_MODE_INPUT_PULLUP, DEBOUNCE_US, GPIO_EDGE_FALLING))
-    	return 1;
+        return 1;
 
     // create watch thread 1
     c_watch* wk1 = new c_watch(&gpio1);
