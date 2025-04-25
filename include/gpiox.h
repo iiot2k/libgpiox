@@ -306,7 +306,7 @@ public:
         if (value == -1)
             return false;
 
-        //toggle value
+        // toggle value
         value = (value == 1) ? 0 : 1;
 
         // write gpio    
@@ -323,7 +323,7 @@ public:
         if (m_pin == -1)
             return print_err("not init");
 
-            // event data
+        // event data
         gpio_v2_line_event event_data;
 
         // poll data
@@ -338,7 +338,7 @@ public:
             // read event data
             int32_t ret = ::read(m_fd, &event_data, sizeof(event_data));
 
-            // check retun code
+            // check return code
             if (ret == -1)
             {
                 // read again
