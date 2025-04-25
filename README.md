@@ -3,6 +3,7 @@
 C++ GPIO Library for Raspberry Pi
 
 The **libgpiox** library uses the Linux GPIO character device interface (V2).<br>
+That's why it works on all Raspberry Pi models and most Linux operating systems.<br>
 The library consists of only one header file **gpiox.h**, which makes it very easy to use.<br>
 Therefore the **libgpiox** library does not need to be built.<br>
 
@@ -79,18 +80,10 @@ After initialization, input/output functions can be called.<br>
 The input/output functions are thread-safe.<br>
 
 ```c++
-int32_t input_val;
-
 // read input
-if (!gpio1.read(input_val))
-    return false;
+int32_t input_val = gpio1.read();
 
-// write output 0
-if (!gpio2.write(1))
-    return false;
-
-// toggle output
-if (!gpio2.toggle())
+if (input_val == -1)
     return false;
 
 // read output
@@ -98,6 +91,15 @@ int32_t output_val = gpio2.read();
 
 if (output_val == -1)
     return false;
+
+// write output
+if (!gpio2.write(1))
+    return false;
+
+// toggle output
+if (!gpio2.toggle())
+    return false;
+
 ```
 
 Monitoring the change of the input pin is possible with the **watch** function.<br>
