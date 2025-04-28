@@ -26,14 +26,15 @@ using namespace std;
 
 /**
  * @brief gpio modes
+ * all modes are active high
  */
 enum {
-    GPIO_MODE_INPUT_NOPULL = 0, // floating input
-    GPIO_MODE_INPUT_PULLDOWN,   // input with pull-down resistor, 1 on connect to +3.3V
-    GPIO_MODE_INPUT_PULLUP,     // input with pull-up resistor, 1 on connect to ground
-    GPIO_MODE_OUTPUT,           // output
-    GPIO_MODE_OUTPUT_SOURCE,    // output source, Hi-Z on 0, +3.3V on 1
-    GPIO_MODE_OUTPUT_SINK,      // output sink, Hi-Z on 0, connect to ground on 1
+    GPIO_MODE_INPUT = 0, // floating input
+    GPIO_MODE_INPUT_PULLDOWN,   // input with pull-down resistor, 1: on connect to +3.3V
+    GPIO_MODE_INPUT_PULLUP,     // input with pull-up resistor, 1: on connect to ground
+    GPIO_MODE_OUTPUT,           // output, 0: connect to ground, 1: +3.3V
+    GPIO_MODE_OUTPUT_SOURCE,    // output source, 0: Hi-Z, 1: +3.3V
+    GPIO_MODE_OUTPUT_SINK,      // output sink,  0: Hi-Z, 1: connect to ground
 };
 
 /**
@@ -94,6 +95,18 @@ class c_gpio
 public:
     /**
      * @brief class constuctor
+     * @note call setchip()
+     */
+    c_gpio()
+    {
+        m_pin = -1;
+        m_fd = -1;
+        m_print_msg = false;
+        m_chip = NULL;
+    }
+
+    /**
+     * @brief class constuctor
      * @param chip pointer to chip
      * @param print_msg flag for print error messages, true = on
      */
@@ -101,6 +114,16 @@ public:
     {
         m_pin = -1;
         m_fd = -1;
+        setchip(chip, print_msg);
+    }
+
+    /**
+     * @brief set chip and message flag
+     * @param chip pointer to chip
+     * @param print_msg flag for print error messages, true = on
+     */
+    void setchip(c_chip* chip, bool print_msg = false)
+    {
         m_print_msg = print_msg;
         m_chip = chip;
     }
@@ -135,9 +158,9 @@ public:
         if (m_print_msg)
         {
             if (msg == NULL)
-                perror(strerror(errno));
+                printf("err: %s\n", strerror(errno));
             else
-                perror(msg);
+                printf("err: %s\n", msg);
         }
 
         return false;
@@ -152,9 +175,9 @@ public:
     /**
      * @brief inits gpio pin
      * @param pin gpio pin 0..27
-     * @param mode constant GPIO_MODE_..
+     * @param mode gpio mode GPIO_MODE_..
      * @param setval input: debounce time in ms, output: gpio state 0/1
-     * @param edge input: constant GPIO_EDGE_..
+     * @param edge input edge GPIO_EDGE_.., ignored on output
      * @returns true: ok, false: error
      */
     bool init(uint32_t pin, uint32_t mode, uint32_t setval = 0, uint32_t edge = GPIO_EDGE_NONE)
@@ -181,30 +204,26 @@ public:
 
         line_request.num_lines = 1;
         line_request.offsets[0] = pin;
-        line_request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT;
 
         // set gpio configuration
         switch(mode)
         {
-        case GPIO_MODE_INPUT_NOPULL:
+        case GPIO_MODE_INPUT:
             line_request.config.flags = GPIO_V2_LINE_FLAG_INPUT + GPIO_V2_LINE_FLAG_BIAS_DISABLED;
             set_line_debounce_us(line_request.config, setval);
-            if (!set_edge_value(line_request.config, edge))
-                return false;
+            set_edge_value(line_request.config, edge);
             break;
 
         case GPIO_MODE_INPUT_PULLDOWN:
             line_request.config.flags = GPIO_V2_LINE_FLAG_INPUT + GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN;
             set_line_debounce_us(line_request.config, setval);
-            if (!set_edge_value(line_request.config, edge))
-                return false;
+            set_edge_value(line_request.config, edge);
             break;
 
         case GPIO_MODE_INPUT_PULLUP:
             line_request.config.flags = GPIO_V2_LINE_FLAG_INPUT + GPIO_V2_LINE_FLAG_BIAS_PULL_UP + GPIO_V2_LINE_FLAG_ACTIVE_LOW;
             set_line_debounce_us(line_request.config, setval);
-            if (!set_edge_value(line_request.config, edge))
-                return false;
+            set_edge_value(line_request.config, edge);
             break;
 
         case GPIO_MODE_OUTPUT:
@@ -214,7 +233,6 @@ public:
 
         case GPIO_MODE_OUTPUT_SOURCE:
             line_request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT + GPIO_V2_LINE_FLAG_OPEN_SOURCE;
-            setval = 0;
             set_line_value(line_request.config, setval);
             break;
 
@@ -246,15 +264,16 @@ public:
 
     /**
      * @brief reads gpio
+     * @param invert if true return inverted state
      * @returns ok: 0/1, error: -1
      */
-    int32_t read()
+    int32_t read(bool invert = false)
     {
         const lock_guard<mutex> lock(m_mtx);
 
         if (m_pin == -1)
         {
-            print_err("not init");
+            print_err("gpio not init");
             return -1;
         }
 
@@ -262,30 +281,39 @@ public:
         line_values.mask = 1;
         line_values.bits = 0;
 
+        // read gpio pin
         if (ioctl(m_fd, GPIO_V2_LINE_GET_VALUES_IOCTL, &line_values))
         {
             print_err();
             return -1;
         }
 
-        return (line_values.bits == 1) ? 1 : 0;
+        if (invert)
+            return (line_values.bits == 1) ? 0 : 1;
+        else
+            return (line_values.bits == 1) ? 1 : 0;
     }
 
     /**
      * @brief sets pin state
      * @param val state to write 0 or 1
+     * @param invert if true write inverted state
      * @returns false: error, true: ok
      */
-    bool write(int32_t val)
+    bool write(int32_t val, bool invert = false)
     {
         const lock_guard<mutex> lock(m_mtx);
 
         if (m_pin == -1)
-            return print_err("not init");
+            return print_err("gpio not init");
 
         gpio_v2_line_values line_values;
         line_values.mask = 1;
-        line_values.bits = val > 0 ? 1 : 0;
+
+        if (invert)
+            line_values.bits = val > 0 ? 0 : 1;
+        else
+            line_values.bits = val > 0 ? 1 : 0;
 
         // write gpio pin
         if (ioctl(m_fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &line_values) == -1)
@@ -296,12 +324,13 @@ public:
 
     /**
      * @brief toggle output
+     * @param invert if true write inverted state
      * @returns false: error, true: ok
      */
-    bool toggle()
+    bool toggle(bool invert = false)
     {
         // read gpio
-        int32_t value = read();
+        int32_t value = read(invert);
 
         if (value == -1)
             return false;
@@ -390,8 +419,8 @@ private:
         line_config.attrs[0].attr.values = setval > 0 ? 1 : 0;
     }
 
-    // set edge
-    bool set_edge_value(gpio_v2_line_config& line_config, uint32_t edge)
+    // set edge parameter
+    void set_edge_value(gpio_v2_line_config& line_config, uint32_t edge)
     {
         // set edge parameter
         switch(edge)
@@ -405,13 +434,10 @@ private:
         case GPIO_EDGE_BOTH:
             line_config.flags += GPIO_V2_LINE_FLAG_EDGE_RISING + GPIO_V2_LINE_FLAG_EDGE_FALLING;
             break;
+        default:
         case GPIO_EDGE_NONE:
             break;
-        default:
-            return print_err("invalid edge");
         }
-
-        return true;
     }
 
     c_chip* m_chip;   // chip

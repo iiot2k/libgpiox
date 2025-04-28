@@ -17,6 +17,7 @@
 
 #include "../include/gpiox.h"
 #include "../include/c_worker.h"
+#include "../include/c_timer.h"
 
 #define OUTPUT_PIN1 21
 #define OUTPUT_PIN2 20
@@ -63,8 +64,8 @@ public:
         // blink output
         while(1)
         {
-            // delay sleep
-            usleep(m_period*1000);
+            // sleep
+            m_timer.sleep_ms(m_period);
 
             // toggle output
             m_gpio->toggle();
@@ -74,6 +75,7 @@ public:
 private:
     int32_t m_period;
     c_gpio* m_gpio;
+    c_timer m_timer;
 };
 
 int main()

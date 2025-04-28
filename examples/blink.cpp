@@ -17,15 +17,16 @@
 #include <cstdlib>
 
 #include "../include/gpiox.h"
+#include "../include/c_timer.h"
 
 #define INPUT_PIN  21
 #define OUTPUT_PIN 20
 
 #define DEBOUNCE_US 10000 // us
+#define PRINT_MSG true // print error on console
+
 #define BLINK_TIME_MS_1 500 // ms
 #define BLINK_TIME_MS_2 1500 // ms
-
-#define PRINT_MSG true // print error on console
 
 // only one chip
 c_chip chip;
@@ -60,6 +61,9 @@ int main()
     if (!gpio2.init(OUTPUT_PIN, GPIO_MODE_OUTPUT))
         return 1;
 
+    // create timer
+    c_timer timer;
+
     // blink output
     while(1)
     {
@@ -72,8 +76,8 @@ int main()
         // set blink rate depends on input state
         int32_t t_ms = (input_val == 1) ? BLINK_TIME_MS_1 : BLINK_TIME_MS_2;
 
-        // delay sleep
-        usleep(t_ms*1000);
+        // sleep 1s
+        timer.sleep_ms(t_ms);
 
         // toggle output
         gpio2.toggle();

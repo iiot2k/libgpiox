@@ -2,6 +2,8 @@
 
 C++ GPIO Library for Raspberry Pi
 
+<a href="https://www.buymeacoffee.com/iiot2ka" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-yellow.png" height="41" width="174"></a><br>
+
 The **libgpiox** library uses the Linux GPIO character device interface (V2).<br>
 That's why it works on all Raspberry Pi models and most Linux operating systems.<br>
 The library consists of only one header file **gpiox.h**, which makes it very easy to use.<br>
@@ -19,7 +21,7 @@ Some examples are in the **examples** folder.
 cd examples
 make
 ```
-> Execute examples:
+> Execute example:
 
 ```
 ./blink
@@ -29,12 +31,14 @@ make
 
 |Mode-Constant|Function|
 |:--|:--|
-|GPIO_MODE_INPUT_NOPULL|floating input|
-|GPIO_MODE_INPUT_PULLDOWN|input with pull-down resistor, 1 on connect to +3.3V|
-|GPIO_MODE_INPUT_PULLUP|input with pull-up resistor, 1 on connect to ground|
-|GPIO_MODE_OUTPUT|output|
-|GPIO_MODE_OUTPUT_SOURCE|output source, Hi-Z on 0, +3.3V on 1|
-|GPIO_MODE_OUTPUT_SINK|output sink, Hi-Z on 0, connect to ground on 1|
+|GPIO_MODE_INPUT|floating input|
+|GPIO_MODE_INPUT_PULLDOWN|input with pull-down resistor, 1: on connect to +3.3V|
+|GPIO_MODE_INPUT_PULLUP|input with pull-up resistor, 1: on connect to ground|
+|GPIO_MODE_OUTPUT|output, 0: connect to ground, 1: +3.3V|
+|GPIO_MODE_OUTPUT_SOURCE|output source, 0: Hi-Z, 1: +3.3V|
+|GPIO_MODE_OUTPUT_SINK|output sink, , 0: Hi-Z, 1: connect to ground|
+
+>All modes are active high.
 
 |Edge-Constant|Function|
 |:--|:--|
@@ -68,7 +72,7 @@ The created instance is initialized with the **init** function.<br>
 #define DEBOUNCE_US 10000 // debounce in us
 
 // init input
-if (!gpio1.init(INPUT_PIN, GPIO_MODE_INPUT_PULLUP, DEBOUNCE_US))
+if (!gpio1.init(INPUT_PIN, GPIO_MODE_INPUT_PULLDOWN, DEBOUNCE_US))
     return false;
 
 // init output
@@ -86,14 +90,18 @@ int32_t input_val = gpio1.read();
 if (input_val == -1)
     return false;
 
-// read output
-int32_t output_val = gpio2.read();
+// read output inverted
+int32_t output_val = gpio2.read(true);
 
 if (output_val == -1)
     return false;
 
 // write output
 if (!gpio2.write(1))
+    return false;
+
+// write output inverted
+if (!gpio2.write(1, true))
     return false;
 
 // toggle output
@@ -122,8 +130,8 @@ else if (edge == GPIO_EDGE_FALLING)
     puts("falling edge occurs");
 ```
 
-### class c_worker
-The **c_worker** class is a simple thread wrapper implementation and has its own header file **c_worker.h**.<br>
+### class c_worker 
+The **c_worker** class is a simple thread wrapper implementation.<br>
 
 ```c++
 #include "../include/c_worker.h"
@@ -148,13 +156,49 @@ private:
     c_gpio* m_gpio;
 }
 
-...
-
 // create worker thread
 c_myworker* wk = new c_myworker(&gpio2);
 
 // start worker thread and wait until ends
 wk->Queue(true);
 
+```
+### class c_timer
+The **c_timer** class is for timer delay and sleep.<br>
+
+```c++
+#include "../include/c_timer.h"
+
+bool pulse()
+{
+    // create timer
+    c_timer timer;
+    
+    // set output
+    if (!gpio2.write(1))
+        return false;
+    
+    // sleep for 1ms
+    timer.sleep_ms(1);
+
+    // reset output
+    return gpio2.write(0);
+}
+```
+
+### class c_priority
+The **c_priority** class is for set high priority on time critical I/O operation.<br>
+
+```c++
+#include "../include/c_priority.h"
+
+bool critical_io()
+{
+    // switch priority
+    c_priority priority;
+
+    // toggle output
+    return gpio2.toggle();
+}
 ```
 
