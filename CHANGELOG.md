@@ -9,3 +9,8 @@
 - Add c_priority, c_timer class
 - Adapt examples
 - Add hx711 and ds18b20 examples
+
+1.0.2
+- Add API.md to all class
+- Add read_sensors, strtoid and idtostr function in c_ds18b20.h
+- Add example read_multi in ds18b20

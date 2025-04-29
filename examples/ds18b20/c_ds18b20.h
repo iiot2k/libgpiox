@@ -9,12 +9,17 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
 #include <mutex>
 using namespace std;
 
 #include "../../include/gpiox.h"
 #include "../../include/c_timer.h"
 #include "../../include/c_priority.h"
+
+// mark temp. as invalid
+#define INV_TEMP -9999.0
 
 // sensor resolution
 enum {
@@ -111,10 +116,73 @@ public:
     }
 
     /**
+     * @brief convert 64bit id to string id
+     * @param id 64 bit sensor id 
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @param len length of s_id 
+     * @returns true: ok, false error
+     */
+    bool idtostr(sensor_id& id, char* s_id, size_t len)
+    {
+        char buffer[20];
+
+        if (s_id == NULL)
+            return print_err("invalid id parameter");
+
+        if (std::snprintf(buffer, sizeof(buffer), "%016llX", id) != 16)
+            return print_err("invalid sensor id");
+        
+        std::snprintf(s_id, len, "%.2s-%.12s", buffer+14, buffer+2);
+
+        return true;
+    }
+
+    /**
+     * @brief convert string id to 64bit id
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @param id 64 bit sensor id 
+     * @returns true: ok, false error
+     */
+    bool strtoid(const char* s_id, sensor_id& id)
+    {
+        if (s_id == NULL)
+            return print_err("invalid id parameter");
+        
+        uint32_t family;
+
+        // scan string id and split to id and family
+        if (sscanf(s_id, "%02X-%llX", &family, &id) != 2)
+            return print_err("invalid sensor id");
+
+        // build 64 bit id
+        id <<= 8;
+        id &= ~(0xFFULL);
+        id |= (sensor_id) family;
+        id |= ((sensor_id) crc8((uint8_t*) &id, 7)) << 56;
+
+        return true;
+    }
+
+    /**
+     * @brief convert string id to 64bit id
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @returns 64 bit sensor id, on error 0;
+     */
+    sensor_id strtoid(const char* s_id)
+    {
+        sensor_id id;
+        
+        if (!strtoid(s_id, id))
+            return 0ULL;
+
+        return id;
+    }
+
+    /**
      * @brief read one sensors with given id
      * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
      * @param fh fh true for fahrenheit, false for celsius
-     * @param temp fh temp receives temperature from sensor
+     * @param temp temp receives temperature from sensor
      * @param repeat number of reads attemps 1..
      * @returns false if no sensor on bus or error
      */
@@ -122,18 +190,11 @@ public:
     {
         const lock_guard<mutex> lock(m_mtx);
 
-        uint32_t family;
         sensor_id id;
-    
-        // scan string id and split to id and family
-        if (sscanf(s_id, "%02X-%llX", &family, &id) != 2)
-            return print_err("invalid sensor id");
-    
-        // build 64 bit id
-        id <<= 8;
-        id &= ~(0xFFULL);
-        id |= (sensor_id) family;
-        id |= ((sensor_id) crc8((uint8_t*) &id, 7)) << 56;
+
+        // convert string id to 64bit id
+        if (!strtoid(s_id, id))
+            return false;
 
         // send start sensor conversion
         if (!start_convert())
@@ -167,7 +228,67 @@ public:
     
         return true;
     }
+
+    /**
+     * @brief read sensors from id list
+     * @param idlist list with 64bit id's
+     * @param fh fh true for fahrenheit, false for celsius
+     * @param templist list that receives temperatures from sensors
+     * @param repeat number of reads attemps 1..
+     * @returns false if no sensor on bus or error
+     * @note if error on read of one sensor, list are marked with INV_TEMP
+     */
+    bool read_sensors(vector<sensor_id>& idlist, bool fh, vector<double>& templist, uint8_t repeat = 10)
+    {
+        // send start sensor conversion
+        if (!start_convert())
+            return false;
     
+        // waits depends on sensor resolution
+        switch(m_res)
+        {
+        case RES_SENSOR_9:
+            m_timer.sleep_ms(100l);
+            break;
+        case RES_SENSOR_10:
+            m_timer.sleep_ms(200l);
+            break;
+        case RES_SENSOR_11:
+            m_timer.sleep_ms(400l);
+            break;
+        default:
+        case RES_SENSOR_12:
+            m_timer.sleep_ms(800l);
+            break;
+        }
+    
+        // clear temperature list
+        templist.clear();
+
+        double temp;
+    
+        // scan id list
+        for (sensor_id id: idlist)
+        {
+            // read sensor data
+            if (!read_sensor(&id, temp, repeat))
+            {
+                // mark invalid temp. in list
+                templist.push_back(INV_TEMP);
+                continue;
+            }
+    
+            // convert to fahrenheit
+            if (fh)
+                temp = temp * (9.0/5.0) + 32.0;
+
+            // add temperature in list
+            templist.push_back(temp);
+        }
+    
+        return true;
+    }
+        
 private:
     /**
      * @brief prints error message if enabled on stderr

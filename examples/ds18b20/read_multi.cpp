@@ -1,5 +1,5 @@
 /*
- * example reads one ds18b20 sensor
+ * example reads multiple ds18b20 sensors
  *
  * connect ds18b20 to gpio pin 21
  * connect pullup resistor between pin 21 and +3.3v    
@@ -8,7 +8,7 @@
  * > make
  *
  * run:
- * > ./read_one
+ * > ./read one
  *
  */
 
@@ -18,7 +18,10 @@
 
 #include "c_ds18b20.h"
 
-#define SENSOR_ID  "28-HHHHHHHHHHHH" // enter your sensor id
+#define SENSOR_ID1  "28-HHHHHHHHHHHH" // enter your sensor id
+#define SENSOR_ID2  "28-HHHHHHHHHHHH" // enter your sensor id
+#define SENSOR_ID3  "28-HHHHHHHHHHHH" // enter your sensor id
+#define SENSOR_ID4  "28-HHHHHHHHHHHH" // enter your sensor id
 
 #define SENSOR_PIN 21 // gpio pin for ds18b20
 #define SENSOR_RES RES_SENSOR_9 // sensor resolution
@@ -31,6 +34,15 @@ c_chip chip;
 
 // ds18b20 driver
 c_ds18b20 ds18b20;
+
+// build idlist
+vector<sensor_id> idlist = 
+{
+    ds18b20.strtoid(SENSOR_ID1),
+    ds18b20.strtoid(SENSOR_ID2),
+    ds18b20.strtoid(SENSOR_ID3),
+    ds18b20.strtoid(SENSOR_ID4)
+};
 
 // signal handler
 void onCtrlC(int signum)
@@ -59,13 +71,21 @@ int main()
     // read loop
     while(1)
     {
-        double temp;
-        
-        // read ds18b20 sensor
-        if (!ds18b20.read_sensor(SENSOR_ID, FAHRENHEIT, temp))
+        // list of temperature
+        vector<double> templist;
+
+        // read ds18b20 sensors from id list
+        if (!ds18b20.read_sensors(idlist, FAHRENHEIT, templist))
             return 1;
 
-        printf("temperature: %.1f°C\n", temp);
+        puts("------------------------");
+        
+        // print all temperatures
+        for (double temp: templist)
+            if (temp == INV_TEMP)
+                puts("not read");
+            else
+                printf("temperature: %.1f°C\n", temp);
         
         // sleep 3s
         timer.sleep_s(3);
