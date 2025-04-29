@@ -1,7 +1,7 @@
 /*
  * example reads one ds18b20 sensor
  *
- * connect ds18b20 to gpio pin 21
+ * connect ds18b20 data pin to gpio pin 21
  * connect pullup resistor between pin 21 and +3.3v    
  * 
  * build:
