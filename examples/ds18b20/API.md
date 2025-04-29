@@ -23,6 +23,9 @@ convert 64bit id to string id
 ```bool strtoid(const char *s_id, sensor_id &id)```<br>
 convert string id to 64bit id
 
+```sensor_id strtoid(const char* s_id)```<br>
+convert string id to 64bit id
+
 ```bool read_sensor (const char *s_id, bool fh, double &temp, uint8_t repeat=10)```<br>
 read one sensors with given id
 
