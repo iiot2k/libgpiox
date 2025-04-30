@@ -14,3 +14,7 @@
 - Add API.md to all class
 - Add read_sensors, strtoid and idtostr function in c_ds18b20.h
 - Add example read_multi in ds18b20
+
+1.0.3
+- Add scan_sensor in c_ds18b20.h
+- Add example scan and scan_read in ds18b20

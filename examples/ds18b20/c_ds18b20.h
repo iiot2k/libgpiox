@@ -116,6 +116,53 @@ public:
     }
 
     /**
+     * @brief scan for sensors
+     * @param idlist list receives 64bit id's
+     * @param repeat number of scan attemps 1..
+     * @returns true: ok, false: error
+     */
+    bool scan_sensor(vector<sensor_id>& idlist, uint8_t repeat = 10)
+    {
+        sensor_id id = 0ULL, _id;
+        int8_t nextbit = 64, _nextbit;
+
+        // clear id list
+        idlist.clear();
+
+        // repeated scan
+        for (uint8_t r = 0; r < repeat; r++)
+        {
+            _id = id;
+            _nextbit = nextbit;
+            
+            // search 1-wire bus for sensors
+            switch(search_sensor(_id, _nextbit))
+            {
+                case -2: // repeat search
+                    break;
+                case -1: // error
+                    return false;
+                case 0: // no more sensors
+                    return true;
+                case 1: // id found
+                    // check crc
+                    if ((_id >>56 ) == crc8((uint8_t*) &_id, 7))
+                    {
+                        r = 0; // reset repeat
+                        id = _id;
+                        nextbit = _nextbit;
+                        
+                        // save id in list
+                        idlist.push_back(id);
+                    }
+            }
+        }
+    
+        // no sensor found
+        return true;
+    }
+    
+    /**
      * @brief convert 64bit id to string id
      * @param id 64 bit sensor id 
      * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
@@ -133,6 +180,27 @@ public:
             return print_err("invalid sensor id");
         
         std::snprintf(s_id, len, "%.2s-%.12s", buffer+14, buffer+2);
+
+        return true;
+    }
+
+    /**
+     * @brief convert 64bit id to string id
+     * @param id 64 bit sensor id 
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @returns true: ok, false error
+     */
+    bool idtostr(sensor_id& id, string& s_id)
+    {
+        char buffer[20];
+        char buffer_out[20];
+
+        if (std::snprintf(buffer, sizeof(buffer), "%016llX", id) != 16)
+            return print_err("invalid sensor id");
+        
+        std::snprintf(buffer_out, sizeof(buffer_out), "%.2s-%.12s", buffer+14, buffer+2);
+
+        s_id = buffer_out;
 
         return true;
     }
@@ -426,7 +494,126 @@ private:
     }
 
     /**
-     * @brief read on byte from 1-wire bus
+     * @brief get bit of 64bit id
+     * @param id 64 bit sensor id 
+     * @param bit bit position 
+     * @returns bit value
+     */
+    int8_t idgetbit(sensor_id& id, int8_t bit)
+    {
+        sensor_id mask = 1ULL << bit;
+    
+        return ((id & mask) ? 1 : 0);
+    }
+    
+    /**
+     * @brief set bit on 64bit id
+     * @param id 64 bit sensor id 
+     * @param bit bit position 
+     * @param bitval bit value to set 
+     * @returns id changed id
+     */
+    sensor_id idsetbit(sensor_id& id, int8_t bit, uint8_t bitval)
+    {
+        sensor_id mask = 1ULL << bit;
+    
+        if((bit >= 0) && (bit < 64))
+        {
+            if (bitval == 0)
+                id &= ~mask;
+            else
+                id |= mask;
+        }
+    
+        return id;
+    }
+
+    /**
+     * @brief scan for sensors
+     * @param id 64 bit sensor id 
+     * @param lastbit bit position 
+     * @returns -2: repeat, -1: error, 0: no more sensors, 1: sensor found
+     */
+    int8_t search_sensor(sensor_id& id, int8_t& lastbit)
+    {
+        c_priority priority;
+    
+        // check lastbit and report no more id's
+        if (lastbit < 0)
+            return 0;
+    
+        // set bit in id and reset remaining id bits
+        if (lastbit < 64)
+        {
+            idsetbit(id, lastbit, 1);
+    
+            for (int32_t idx = lastbit + 1; idx < 64; idx++)
+                idsetbit(id, idx, 0);
+        }
+    
+        lastbit = -1;
+    
+        // resets 1-wire bus
+        if (!reset())
+            return -1; // return error
+    
+        write_byte(SEARCH_ROM);
+    
+        // examine 64bit stream
+        for (int8_t idx=0; idx < 64; idx++)
+        {
+            // read bits in sequence
+            uint8_t nobit = read_bit();
+            uint8_t bit = read_bit();
+    
+            // check for bit mismatch
+            if (bit && nobit)
+                return -2; // report bit mismatch -> repeat
+    
+            // check bits
+            if (!bit && !nobit) 
+            {
+                if (idgetbit(id, idx))
+                    write_bit(1);
+                else
+                {
+                    lastbit = idx;
+                    write_bit(0);
+                }
+            }
+            else if (!bit) // it is a 1
+            {
+                write_bit(1);
+                idsetbit(id, idx, 1);
+            }
+            else // it is a 0
+            {
+                write_bit(0);
+                idsetbit(id, idx, 0);
+            }
+        }
+    
+        return 1; // valid id found
+    }
+
+    /**
+     * @brief read on bit from 1-wire bus
+     * @returns byte value
+     */
+    uint8_t read_bit()
+    {
+        int8_t bit;
+        set_low();
+        m_timer.delay_us(1l);
+        set_high();
+        m_timer.delay_us(2l);
+        bit = read();
+        m_timer.delay_us(60l);
+        return bit;
+    }
+            
+    /**
+     * @brief read one byte from 1-wire bus
      * @returns byte value
      */
     uint8_t read_byte()
@@ -459,7 +646,31 @@ private:
         for (uint8_t i=0; i<len; i++)
             data[i] = read_byte();
     }
+
+    /**
+     * @brief write one bit to 1-wire bus
+     * @param bit data to write
+     */
+    void write_bit(uint8_t bit)
+    {
+        set_low();
     
+        if (bit)
+        {
+            m_timer.delay_us(1l);
+            set_high();
+            m_timer.delay_us(60l);
+        }
+        else
+        {
+            m_timer.delay_us(60l);
+            set_high();
+            m_timer.delay_us(1l);
+        }
+    
+        m_timer.delay_us(60l);
+    }
+        
     /**
      * @brief write one byte to 1-wire bus
      * @param byte data to write

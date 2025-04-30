@@ -17,7 +17,13 @@ inits sensor gpio pin
 ```bool set_resolution (uint32_t res)```<br>
 set resolution on all sensors on bus
 
+```bool scan_sensor(vector<sensor_id>& idlist, uint8_t repeat = 10)```<br>
+scan for sensors
+
 ```bool idtostr(sensor_id &id, char *s_id, size_t len)```<br>
+convert 64bit id to string id
+
+```bool idtostr(sensor_id& id, string& s_id)```<br>
 convert 64bit id to string id
  
 ```bool strtoid(const char *s_id, sensor_id &id)```<br>
