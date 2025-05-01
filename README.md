@@ -27,6 +27,13 @@ make
 ./blink
 ```
 
+> Extended examples:<br>
+
+```/examples/ds18b20``` : 1-wire temperature sensor **ds18b20** library using **gpiox**.<br>
+```/examples/hx711``` : Load cell adc **hx711** library using **gpiox**.<br>
+
+All class functions are described in document **API.md**.
+
 ### Constants
 
 |Mode-Constant|Function|
