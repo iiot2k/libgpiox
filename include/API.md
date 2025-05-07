@@ -42,12 +42,18 @@ class destructor
 ```void deinit()```<br>
 deinits gpio pin
  
-```bool print_err(const char *msg=NULL)```<br>
-prints error message if enabled on stderr
- 
 ```int32_t get_pin()```<br>
 returns gpio pin number
- 
+
+```void clear_error()```<br>
+clears message buffer
+
+```const char* get_error()```<br>
+returns error message
+
+```bool print_error(const char* msg = NULL)```<br>
+stores message and prints error message if enabled on stderr
+
 ```bool init(uint32_t pin, uint32_t mode, uint32_t setval=0, uint32_t edge=GPIO_EDGE_NONE)```<br>
 inits gpio pin
  

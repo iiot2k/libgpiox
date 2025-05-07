@@ -18,3 +18,9 @@
 1.0.3
 - Add scan_sensor in c_ds18b20.h
 - Add example scan and scan_read in ds18b20
+
+1.0.4
+- Add store error message in gpiox
+- Add clear_error and get_error functions in gpiox, ds18b20 and hx711
+- Bugfix in ds18b20
+- Add counter example

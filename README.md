@@ -2,12 +2,11 @@
 
 C++ GPIO Library for Raspberry Pi
 
-<a href="https://www.buymeacoffee.com/iiot2ka" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-yellow.png" height="41" width="174"></a><br>
-
 The **libgpiox** library uses the Linux GPIO character device interface (V2).<br>
 That's why it works on all Raspberry Pi models and most Linux operating systems.<br>
 The library consists of only one header file **gpiox.h**, which makes it very easy to use.<br>
 Therefore the **libgpiox** library does not need to be built.<br>
+No installation of other libraries necessary.<br>
 
 ```c++
 #include "../include/gpiox.h"

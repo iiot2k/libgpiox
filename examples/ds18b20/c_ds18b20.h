@@ -23,23 +23,14 @@ using namespace std;
 
 // sensor resolution
 enum {
-    RES_SENSOR_9 = 0,
-    RES_SENSOR_10,
-    RES_SENSOR_11,
-    RES_SENSOR_12,
+    RES_SENSOR_9 = 0, // 9bit
+    RES_SENSOR_10,    // 10bit
+    RES_SENSOR_11,    // 11bit
+    RES_SENSOR_12,    // 12bit
 };
 
 // sensor id (64bit)
 typedef unsigned long long sensor_id;
-
-// One wire command codes
-#define SKIP_ROM   0xCC
-#define MATCH_ROM  0x55
-#define SEARCH_ROM 0xF0
-#define COVERT_T   0x44
-#define WRITE_PAD  0x4E
-#define COPY_PAD   0x48
-#define READ_PAD   0xBE
 
 class c_ds18b20
 {
@@ -49,8 +40,109 @@ public:
      */
     c_ds18b20()
     {
-        m_print_msg = false;
         m_res = RES_SENSOR_12;
+    }
+
+    /**
+     * @brief returns message buffer
+     * @returns message
+     */
+    const char* get_error()
+    {
+        return m_gpio.get_error();
+    }
+
+    /**
+     * @brief convert 64bit id to string id
+     * @param id 64 bit sensor id
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @param len length of s_id
+     * @returns true: ok, false error
+     */
+    bool idtostr(sensor_id& id, char* s_id, size_t len)
+    {
+        // clear error
+        clear_error();
+
+        char buffer[20];
+
+        if (s_id == NULL)
+            return print_error("ds18b20: invalid id parameter");
+
+        if (std::snprintf(buffer, sizeof(buffer), "%016llX", id) != 16)
+            return print_error("ds18b20: invalid sensor id");
+
+        std::snprintf(s_id, len, "%.2s-%.12s", buffer+14, buffer+2);
+
+        return true;
+    }
+
+    /**
+     * @brief convert 64bit id to string id
+     * @param id 64 bit sensor id
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @returns true: ok, false error
+     */
+    bool idtostr(sensor_id& id, string& s_id)
+    {
+        // clear error
+        clear_error();
+
+        char buffer[20];
+        char buffer_out[20];
+
+        if (std::snprintf(buffer, sizeof(buffer), "%016llX", id) != 16)
+            return print_error("ds18b20: invalid sensor id");
+
+        std::snprintf(buffer_out, sizeof(buffer_out), "%.2s-%.12s", buffer+14, buffer+2);
+
+        s_id = buffer_out;
+
+        return true;
+    }
+
+    /**
+     * @brief convert string id to 64bit id
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @param id 64 bit sensor id
+     * @returns true: ok, false error
+     */
+    bool strtoid(const char* s_id, sensor_id& id)
+    {
+        // clear error
+        clear_error();
+
+        if (s_id == NULL)
+            return print_error("ds18b20: invalid id parameter");
+
+        uint32_t family;
+
+        // scan string id and split to id and family
+        if (sscanf(s_id, "%02X-%llX", &family, &id) != 2)
+            return print_error("ds18b20: invalid sensor id");
+
+        // build 64 bit id
+        id <<= 8;
+        id &= ~(0xFFULL);
+        id |= (sensor_id) family;
+        id |= ((sensor_id) crc8((uint8_t*) &id, 7)) << 56;
+
+        return true;
+    }
+
+    /**
+     * @brief convert string id to 64bit id
+     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
+     * @returns 64 bit sensor id, on error 0;
+     */
+    sensor_id strtoid(const char* s_id)
+    {
+        sensor_id id;
+
+        if (!strtoid(s_id, id))
+            return 0ULL;
+
+        return id;
     }
 
     /**
@@ -63,7 +155,6 @@ public:
     bool init(c_chip* chip, uint32_t pin, bool print_msg = false)
     {
         m_gpio.setchip(chip, print_msg);
-        m_print_msg = print_msg;
         
         // init gpio pin
         return m_gpio.init(pin, GPIO_MODE_OUTPUT);
@@ -76,12 +167,11 @@ public:
      */
     bool set_resolution(uint32_t res)
     {
-        c_priority priority;
-    
-        // resets 1-wire bus
-        if (!reset())
-            return false;
-    
+        const lock_guard<mutex> lock(m_mtx);
+
+        // clear error
+        clear_error();
+
         uint8_t cfg;
 
         // set parameter depends on on sensor resolution
@@ -102,12 +192,9 @@ public:
             break;
         }
     
-        // 1-wire set procedure for set pad
-        write_byte(SKIP_ROM);
-        write_byte(WRITE_PAD);
-        write_byte(0xFF); // TH
-        write_byte(0xFF); // TL
-        write_byte(cfg); // resolution
+        // write resolution to sensors
+        if (!write_pad(cfg))
+        	return false;
     
         m_timer.sleep_ms(1);
         m_res = res;
@@ -123,6 +210,11 @@ public:
      */
     bool scan_sensor(vector<sensor_id>& idlist, uint8_t repeat = 10)
     {
+        const lock_guard<mutex> lock(m_mtx);
+
+        // clear error
+        clear_error();
+
         sensor_id id = 0ULL, _id;
         int8_t nextbit = 64, _nextbit;
 
@@ -161,90 +253,6 @@ public:
         // no sensor found
         return true;
     }
-    
-    /**
-     * @brief convert 64bit id to string id
-     * @param id 64 bit sensor id 
-     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
-     * @param len length of s_id 
-     * @returns true: ok, false error
-     */
-    bool idtostr(sensor_id& id, char* s_id, size_t len)
-    {
-        char buffer[20];
-
-        if (s_id == NULL)
-            return print_err("invalid id parameter");
-
-        if (std::snprintf(buffer, sizeof(buffer), "%016llX", id) != 16)
-            return print_err("invalid sensor id");
-        
-        std::snprintf(s_id, len, "%.2s-%.12s", buffer+14, buffer+2);
-
-        return true;
-    }
-
-    /**
-     * @brief convert 64bit id to string id
-     * @param id 64 bit sensor id 
-     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
-     * @returns true: ok, false error
-     */
-    bool idtostr(sensor_id& id, string& s_id)
-    {
-        char buffer[20];
-        char buffer_out[20];
-
-        if (std::snprintf(buffer, sizeof(buffer), "%016llX", id) != 16)
-            return print_err("invalid sensor id");
-        
-        std::snprintf(buffer_out, sizeof(buffer_out), "%.2s-%.12s", buffer+14, buffer+2);
-
-        s_id = buffer_out;
-
-        return true;
-    }
-
-    /**
-     * @brief convert string id to 64bit id
-     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
-     * @param id 64 bit sensor id 
-     * @returns true: ok, false error
-     */
-    bool strtoid(const char* s_id, sensor_id& id)
-    {
-        if (s_id == NULL)
-            return print_err("invalid id parameter");
-        
-        uint32_t family;
-
-        // scan string id and split to id and family
-        if (sscanf(s_id, "%02X-%llX", &family, &id) != 2)
-            return print_err("invalid sensor id");
-
-        // build 64 bit id
-        id <<= 8;
-        id &= ~(0xFFULL);
-        id |= (sensor_id) family;
-        id |= ((sensor_id) crc8((uint8_t*) &id, 7)) << 56;
-
-        return true;
-    }
-
-    /**
-     * @brief convert string id to 64bit id
-     * @param s_id string id of sensor in format 28-HHHHHHHHHHHH (hex)
-     * @returns 64 bit sensor id, on error 0;
-     */
-    sensor_id strtoid(const char* s_id)
-    {
-        sensor_id id;
-        
-        if (!strtoid(s_id, id))
-            return 0ULL;
-
-        return id;
-    }
 
     /**
      * @brief read one sensors with given id
@@ -258,7 +266,12 @@ public:
     {
         const lock_guard<mutex> lock(m_mtx);
 
+        // clear error
+        clear_error();
+
         sensor_id id;
+        
+        temp = INV_TEMP;
 
         // convert string id to 64bit id
         if (!strtoid(s_id, id))
@@ -308,6 +321,11 @@ public:
      */
     bool read_sensors(vector<sensor_id>& idlist, bool fh, vector<double>& templist, uint8_t repeat = 10)
     {
+        const lock_guard<mutex> lock(m_mtx);
+
+        // clear error
+        clear_error();
+
         // send start sensor conversion
         if (!start_convert())
             return false;
@@ -358,17 +376,33 @@ public:
     }
         
 private:
+    // One wire command codes
+    enum {
+        SKIP_ROM   = 0xCC,
+        MATCH_ROM  = 0x55,
+        SEARCH_ROM = 0xF0,
+        COVERT_T   = 0x44,
+        WRITE_PAD  = 0x4E,
+        COPY_PAD   = 0x48,
+        READ_PAD   = 0xBE
+    };
+
+    /**
+     * @brief clears error message
+     */
+    void clear_error()
+    {
+        m_gpio.clear_error();
+    }
+
     /**
      * @brief prints error message if enabled on stderr
      * @param msg message to print
      * @returns always false
      */
-    bool print_err(const char* msg)
+    bool print_error(const char* msg)
     {
-        if (m_print_msg)
-            printf("err: %s\n", msg);
-
-        return false;
+        return m_gpio.print_error(msg);
     }
 
     /**
@@ -417,9 +451,32 @@ private:
 
         // 1-wire bus must set to 0 on present sensors
         if (bit != 0)
-            return print_err("no sensor");
+            return print_error("ds18b20: no sensor");
 
         return true;
+    }
+
+    /**
+     * @brief write pad command
+     * @param cfg sensor resolution
+     * @returns false if no sensor on bus or error
+     */
+    bool write_pad(uint8_t cfg)
+    {
+        c_priority priority;
+
+        // resets 1-wire bus
+        if (!reset())
+            return false;
+
+        // 1-wire set procedure for set pad
+		write_byte(SKIP_ROM);
+		write_byte(WRITE_PAD);
+		write_byte(0xFF); // TH
+		write_byte(0xFF); // TL
+		write_byte(cfg); // resolution
+
+		return true;
     }
 
     /**
@@ -490,7 +547,7 @@ private:
             return true;
         }
     
-        return print_err("no sensor read");
+        return print_error("ds18b20: no sensor read");
     }
 
     /**
@@ -718,7 +775,6 @@ private:
 
     c_gpio m_gpio;    // sensor gpio
     c_timer m_timer;  // used for delay and sleep
-    bool m_print_msg; // flag for print message
     uint32_t m_res;   // saved resolution
     mutex m_mtx;      // lock mutex
 };

@@ -82,9 +82,7 @@ int main()
         
         // print all temperatures
         for (double temp: templist)
-            if (temp == INV_TEMP)
-                puts("not read");
-            else
+            if (temp != INV_TEMP)
                 printf("temperature: %.1f°C\n", temp);
         
         // sleep 3s

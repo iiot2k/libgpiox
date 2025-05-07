@@ -149,28 +149,49 @@ public:
     }
 
     /**
-     * @brief prints error message if enabled on stderr
-     * @param msg message to print, if NULL errno is print
-     * @returns always false
-     */
-    bool print_err(const char* msg = NULL)
-    {
-        if (m_print_msg)
-        {
-            if (msg == NULL)
-                printf("err: %s\n", strerror(errno));
-            else
-                printf("err: %s\n", msg);
-        }
-
-        return false;
-    }
-
-    /**
      * @brief returns gpio pin number
      * @returns 0..27, -1 if not init
      */
     int32_t get_pin() { return m_pin; }
+
+    /**
+     * @brief clears message buffer
+     */
+    void clear_error()
+    {
+        m_msg.erase();
+    }
+
+    /**
+     * @brief returns error message
+     * @returns message
+     */
+    const char* get_error()
+    {
+        return m_msg.c_str();
+    }
+
+    /**
+     * @brief stores message and prints error message if enabled on stderr
+     * @param msg message to print, if NULL errno is print
+     * @returns always false
+     */
+    bool print_error(const char* msg = NULL)
+    {
+        if (msg == NULL)
+        {
+            m_msg = "gpiox: "; 
+            m_msg += strerror(errno);
+        }
+        else
+            m_msg = msg;
+
+        // if flag set print error on console
+        if (m_print_msg)
+            puts(get_error());
+
+        return false;
+    }
 
     /**
      * @brief inits gpio pin
@@ -182,17 +203,20 @@ public:
      */
     bool init(uint32_t pin, uint32_t mode, uint32_t setval = 0, uint32_t edge = GPIO_EDGE_NONE)
     {
+        // clear error
+        clear_error();
+
         // check pin
         if (pin >= N_PIN)
-            return print_err("invalid pin");
+            return print_error("gpiox: invalid pin");
 
         // valid chip ?
         if (m_chip == NULL)
-            return print_err("invalid chip");
+            return print_error("gpiox: invalid chip");
 
         // check if chip is open
         if (m_chip->get_fd() == -1)
-            return print_err("chip not open");
+            return print_error("gpiox: chip not open");
 
         // close gpio
         deinit();
@@ -242,16 +266,16 @@ public:
             break;
 
         default:
-            return print_err("invalid mode");
+            return print_error("gpiox: invalid mode");
         }
 
         // init gpio pin
         if (ioctl(m_chip->get_fd(), GPIO_V2_GET_LINE_IOCTL, &line_request) == -1)
-            return print_err();
+            return print_error();
 
         // check for valid handle
         if (line_request.fd < 0)
-            return print_err();
+            return print_error();
 
         // set file handle
         m_fd = line_request.fd;
@@ -271,9 +295,12 @@ public:
     {
         const lock_guard<mutex> lock(m_mtx);
 
+        // clear error
+        clear_error();
+
         if (m_pin == -1)
         {
-            print_err("gpio not init");
+            print_error("gpiox: gpio not init");
             return -1;
         }
 
@@ -284,7 +311,7 @@ public:
         // read gpio pin
         if (ioctl(m_fd, GPIO_V2_LINE_GET_VALUES_IOCTL, &line_values))
         {
-            print_err();
+            print_error();
             return -1;
         }
 
@@ -304,8 +331,11 @@ public:
     {
         const lock_guard<mutex> lock(m_mtx);
 
+        // clear error
+        clear_error();
+
         if (m_pin == -1)
-            return print_err("gpio not init");
+            return print_error("gpiox: gpio not init");
 
         gpio_v2_line_values line_values;
         line_values.mask = 1;
@@ -317,7 +347,7 @@ public:
 
         // write gpio pin
         if (ioctl(m_fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &line_values) == -1)
-            return print_err();
+            return print_error();
 
         return true;
     }
@@ -349,8 +379,11 @@ public:
      */
     bool watch(uint32_t& edge)
     {
+        // clear error
+        clear_error();
+
         if (m_pin == -1)
-            return print_err("not init");
+            return print_error("gpiox: not init");
 
         // event data
         gpio_v2_line_event event_data;
@@ -362,7 +395,7 @@ public:
         {
             // wait for event
             if (poll(&pfd, 1, -1) <= 0)
-                return print_err();
+                return print_error();
 
             // read event data
             int32_t ret = ::read(m_fd, &event_data, sizeof(event_data));
@@ -374,12 +407,12 @@ public:
                 if (errno == -EAGAIN)
                     continue;
                 else
-                    return print_err();
+                    return print_error();
             }
 
             // check if read all data
             if (ret != sizeof(event_data))
-                return print_err();
+                return print_error();
 
             break;
         }
@@ -444,5 +477,6 @@ private:
     int32_t m_pin;    // gpio pin
     int32_t m_fd;     // gpio pin handle
     bool m_print_msg; // flag for print message
+    string m_msg;     // store for messages
     mutex m_mtx;      // lock mutex
 };

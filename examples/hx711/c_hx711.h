@@ -37,7 +37,6 @@ public:
      */
     c_hx711()
     {
-        m_print_msg = false;
         m_gain = GAIN_A128;
     }
 
@@ -60,6 +59,15 @@ public:
     }
 
     /**
+     * @brief returns error message
+     * @returns message
+     */
+    const char* get_error()
+    {
+        return m_gpio_dt.get_error();
+    }
+
+    /**
      * @brief inits dt + cl pins and hx711 
      * @param chip pointer to chip
      * @param pin_dt dt pin (0..27)
@@ -69,13 +77,15 @@ public:
      */
     bool init(c_chip* chip, uint32_t pin_dt, uint32_t pin_cl, bool print_msg = false)
     {
+        // clear error
+        clear_error();
+
         m_gpio_dt.setchip(chip, print_msg); // dt pin
         m_gpio_cl.setchip(chip, print_msg); // cl pin
-        m_print_msg = print_msg;
 
         // init cl pin
         if (!m_gpio_cl.init(pin_cl, GPIO_MODE_OUTPUT))
-            return false;
+            return m_gpio_dt.print_error(m_gpio_cl.get_error());
 
         // init dt pin
         if (!m_gpio_dt.init(pin_dt, GPIO_MODE_INPUT))
@@ -92,17 +102,20 @@ public:
      * @param nread count of reads for average (1..)
      * @returns true: ok, false: error
      */
-    bool read(double& value, uint32_t gain = GAIN_A128, uint32_t nread = 10)
+    bool read(double& value, uint32_t gain = GAIN_A128, uint32_t nread = 5)
     {
         const lock_guard<mutex> lock(m_mtx);
 
+        // clear error
+        clear_error();
+
         // check gain
         if ((gain < GAIN_A128) || (gain > GAIN_A64))
-            return print_err("invalid gain");
+            return print_error("hx711: invalid gain");
 
         // adjust nread
         if (nread == 0)
-            nread = 10;
+            nread = 5;
 
         value = 0.0;
 
@@ -133,6 +146,25 @@ public:
 
 private:
     /**
+     * @brief clears message buffer
+     */
+    void clear_error()
+    {
+        m_gpio_cl.clear_error();
+        m_gpio_dt.clear_error();
+    }
+
+    /**
+     * @brief prints error message if enabled on stderr
+     * @param msg message to print
+     * @returns always false
+     */
+    bool print_error(const char* msg)
+    {
+        return m_gpio_dt.print_error(msg);
+    }
+
+    /**
      * @brief waits hx711 ready until timeout
      * @returns true: ok, false: timeout
      */
@@ -147,7 +179,7 @@ private:
             m_timer.sleep_ms(10); // delay 10ms
         }
 
-        return print_err("wait timeout");
+        return print_error("hx711: wait timeout");
     }
 
     /**
@@ -187,24 +219,10 @@ private:
         return int32_t(data);
     }
 
-    /**
-     * @brief prints error message if enabled on stderr
-     * @param msg message to print
-     * @returns always false
-     */
-    bool print_err(const char* msg)
-    {
-        if (m_print_msg)
-            printf("err: %s\n", msg);
-
-        return false;
-    }
-
     c_gpio m_gpio_dt; // hx711 data gpio
     c_gpio m_gpio_cl; // hx711 clock gpio
 
     uint32_t m_gain;  // save gain
-    bool m_print_msg; // flag for print message
     mutex m_mtx;      // lock mutex
     c_timer m_timer;  // timer
 };
